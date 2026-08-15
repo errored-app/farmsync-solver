@@ -1,0 +1,67 @@
+# Tag -> test -> verify the tag -> build -> checksum -> publish.
+#
+# Tests run before the build so a broken tag never becomes a release, and the
+# version check runs before the build so a mismatched tag fails in seconds
+# rather than after a five-minute freeze.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt pyinstaller
+
+      - name: Run the test suite
+        # No config.json here, and none is needed: tests/conftest.py imports
+        # the real src/util.py with fake bytes fed to open().
+        run: python -m pytest
+
+      - name: Tag must match src/version.py
+        shell: pwsh
+        run: |
+          $declared = python -c "from src.version import __version__; print(__version__)"
+          $tagged = "${{ github.ref_name }}".TrimStart("v")
+          if ($declared -ne $tagged) {
+            throw "tag v$tagged does not match src/version.py ($declared)"
+          }
+          Write-Host "version $declared confirmed"
+
+      - name: Build
+        run: python -m PyInstaller --noconfirm --clean FarmsyncSolver.spec
+
+      - name: Write SHA256SUMS.txt
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash dist\FarmsyncSolver.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  FarmsyncSolver.exe" | Out-File -Encoding ascii -NoNewline dist\SHA256SUMS.txt
+          Get-Content dist\SHA256SUMS.txt
+
+      - name: Publish the release
+        # Pinned to a commit, not to the floating v2 tag: this job holds
+        # contents: write, which is the credential that publishes a binary
+        # people will double-click. A moved tag would ship somebody else's
+        # code with it. Bump this deliberately, with the version in the
+        # comment. Resolved with `git ls-remote`; v2 pointed here at v2.6.2.
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: CHANGELOG.md
+          files: |
+            dist/FarmsyncSolver.exe
+            dist/SHA256SUMS.txt

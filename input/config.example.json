@@ -1,0 +1,13 @@
+{
+    "api_key": "REPLACE_WITH_DIBYCAP_API_KEY",
+    "farm_token": "REPLACE_WITH_FARMSYNC_BEARER_TOKEN",
+    "threads": 45,
+    "round_delay": 60,
+    "dead_device_minutes": 30,
+    "grace_minutes": 0,
+    "grace_probe_rate": 0.02,
+    "ban_recheck_minutes": 120,
+    "status_poll_seconds": 60,
+    "alert_below_solves": 5000,
+    "discord_webhook_url": "REPLACE_WITH_DISCORD_WEBHOOK_URL"
+}
